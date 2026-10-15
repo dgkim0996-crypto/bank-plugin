@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>은행 모드</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon32.png" width="24" height="24" alt="">
+    <h1>은행 모드</h1>
+  </header>
+
+  <div class="status">
+    <span id="dot" class="dot"></span>
+    <strong id="state">확인 중…</strong>
+  </div>
+  <p id="sub" class="sub"></p>
+
+  <div id="prompt" class="prompt" hidden>
+    <strong id="promptSite"></strong>
+    <span>은행 모드가 꺼져 있어요 — 켤까요?</span>
+  </div>
+
+  <div class="buttons">
+    <button id="on" class="primary" disabled>은행 모드 켜기</button>
+    <button id="off" class="secondary" disabled>끄기</button>
+  </div>
+
+  <p id="hint" class="hint" hidden>확인 창이 안 보이면 작업 표시줄에서 깜박이는 아이콘을 누르세요. 이 창은 닫혀도 계속 진행돼요.</p>
+
+  <div id="result" class="result" hidden>
+    <p id="resultMsg"></p>
+    <ul id="failures"></ul>
+    <button id="reload" class="link" hidden title="은행 사이트가 켜진 보안 프로그램을 다시 확인해요">이 페이지 새로고침</button>
+  </div>
+
+  <div id="setup" class="setup" hidden>
+    <p id="setupMsg"></p>
+    <ol>
+      <li>은행 모드 앱(BankMode.exe)을 실행</li>
+      <li>창 아래쪽 <b>크롬 확장 연결</b> 누르기</li>
+      <li>이 창을 다시 열기</li>
+    </ol>
+  </div>
+
+  <p id="warning" class="warning" hidden></p>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

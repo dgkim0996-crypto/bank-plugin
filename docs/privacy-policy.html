@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>은행 모드 — 개인정보처리방침</title>
+<meta name="description" content="크롬 확장 프로그램 '은행 모드'의 개인정보처리방침. 이 확장은 어떤 개인정보도 수집하거나 외부로 전송하지 않습니다." />
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --muted: #5b6472;
+    --line: #e4e7ec;
+    --accent: #2563eb;
+    --ok-bg: #ecfdf3;
+    --ok-ink: #166534;
+    --ok-line: #bbf7d0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1420;
+      --card: #161c29;
+      --ink: #e6e9ef;
+      --muted: #9aa4b2;
+      --line: #263041;
+      --accent: #6ea8ff;
+      --ok-bg: #0e2a1b;
+      --ok-ink: #7ee2a8;
+      --ok-line: #1f5438;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1420;
+    --card: #161c29;
+    --ink: #e6e9ef;
+    --muted: #9aa4b2;
+    --line: #263041;
+    --accent: #6ea8ff;
+    --ok-bg: #0e2a1b;
+    --ok-ink: #7ee2a8;
+    --ok-line: #1f5438;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Malgun Gothic", "맑은 고딕", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+  header { margin-bottom: 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin: 0 0 18px;
+  }
+  .tldr {
+    background: var(--ok-bg);
+    border-color: var(--ok-line);
+    color: var(--ok-ink);
+    font-weight: 600;
+  }
+  h2 { font-size: 1.15rem; margin: 0 0 10px; }
+  h3 { font-size: 1rem; margin: 18px 0 6px; }
+  p, li { color: var(--ink); }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+  .muted { color: var(--muted); }
+  code {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 0.88em;
+    font-family: Consolas, "Courier New", monospace;
+  }
+  a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.95rem; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .fill { color: #b45309; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fill { color: #fbbf24; } }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  .en { color: var(--muted); font-size: 0.95rem; }
+  .en h2 { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>개인정보처리방침</h1>
+    <p class="meta">크롬 확장 프로그램 「은행 모드」 · 최종 수정일 2026-10-15</p>
+  </header>
+
+  <div class="card tldr">
+    이 확장 프로그램은 이용자의 어떤 개인정보도 <u>수집·저장(원격)·외부 전송하지 않습니다.</u>
+    모든 처리는 이용자의 컴퓨터 안에서만 이루어지며, 외부 서버로 보내는 정보는 없습니다.
+  </div>
+
+  <div class="card">
+    <h2>1. 수집·전송하는 개인정보</h2>
+    <p><strong>없습니다.</strong> 이 확장은 이름·연락처·계정·금융정보 등 어떤 개인정보도 수집하지 않고,
+    외부(인터넷상의 서버, 개발자, 제3자)로 전송하지 않습니다.</p>
+    <p>이 확장은 <strong>같은 컴퓨터에 설치된 「은행 모드」 앱(BankMode.exe)</strong> 과만 통신합니다.
+    이 통신은 네트워크(인터넷)를 거치지 않고 운영체제 내부(Chrome Native Messaging)에서만 이루어집니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. 확장이 접근하는 정보와 사용 방식 (모두 로컬 처리)</h2>
+    <table>
+      <tr><th>정보</th><th>용도</th><th>외부 전송</th></tr>
+      <tr>
+        <td>현재 보고 있는 탭의 주소, 그리고 <code>manifest.json</code>에 등록된 금융·공공 사이트 탭의 주소</td>
+        <td>지금 화면이 은행/공공 사이트인지 <strong>브라우저 안에서 비교</strong>해, 보안 프로그램이 꺼져 있으면 아이콘에 알림 배지를 표시</td>
+        <td>안 함 (앱에도 보내지 않음)</td>
+      </tr>
+      <tr>
+        <td>보안 프로그램 상태 (실행 여부·개수·메모리 사용량)</td>
+        <td>같은 PC의 「은행 모드」 앱에서 받아 팝업에 표시</td>
+        <td>안 함</td>
+      </tr>
+      <tr>
+        <td>브라우저 저장소 (<code>chrome.storage</code>)</td>
+        <td>위 상태와 사이트 목록을 <strong>이 브라우저에만</strong> 임시 저장(표시용)</td>
+        <td>안 함</td>
+      </tr>
+    </table>
+    <p class="muted">탭 주소는 은행 사이트인지 판단하는 데만 쓰이며, 기록되거나 어디로도 전송되지 않습니다.
+    방문 기록 전체를 읽지 않습니다(<code>tabs</code> 권한을 사용하지 않음).</p>
+  </div>
+
+  <div class="card">
+    <h2>3. 외부 서버·제3자·추적</h2>
+    <ul>
+      <li>외부 서버로의 통신이 <strong>전혀 없습니다</strong> (확장 코드에 네트워크 요청이 없습니다).</li>
+      <li>광고·애널리틱스·추적 도구·쿠키를 <strong>사용하지 않습니다.</strong></li>
+      <li>데이터를 제3자와 <strong>공유하거나 판매하지 않습니다.</strong></li>
+      <li>통신 상대는 오직 같은 컴퓨터에 설치된 「은행 모드」 앱뿐입니다.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>4. 요청하는 권한과 이유</h2>
+    <table>
+      <tr><th>권한</th><th>이유</th></tr>
+      <tr><td><code>nativeMessaging</code></td><td>같은 PC의 「은행 모드」 앱과 통신(상태 확인, 켜기/끄기)</td></tr>
+      <tr><td><code>storage</code></td><td>상태·사이트 목록을 브라우저에 임시 저장(표시용)</td></tr>
+      <tr><td><code>activeTab</code></td><td>팝업을 열 때 <strong>지금 보고 있는 탭</strong>만 확인(은행 사이트 판단·새로고침)</td></tr>
+      <tr><td>금융·공공 도메인 <code>host_permissions</code></td><td>등록된 은행/공공 사이트에서만 자동으로 알림 배지를 표시</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>5. 보관 및 삭제</h2>
+    <p>저장되는 정보는 표시용 상태값뿐이며 이용자의 브라우저 저장소에만 있습니다.
+    확장 프로그램을 삭제하면 이 정보도 함께 사라집니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>6. 문의</h2>
+    <p>개인정보처리방침에 대한 문의는 아래로 연락해 주세요.</p>
+    <p>이메일: <strong>tms05112@naver.com</strong></p>
+  </div>
+
+  <div class="card">
+    <h2>7. 변경</h2>
+    <p>이 방침이 바뀌면 이 페이지와 최종 수정일을 갱신합니다.</p>
+  </div>
+
+  <hr />
+
+  <div class="en">
+    <h2>Privacy Policy (English summary)</h2>
+    <p><strong>This extension does not collect, store remotely, or transmit any personal or user data.</strong>
+    It has no network requests, no analytics, no ads, no trackers, and no third-party sharing.</p>
+    <p>The extension communicates only with the companion <strong>BankMode</strong> application installed on the
+    same computer, over the operating system's Chrome Native Messaging — never over the internet. It uses the
+    current tab's URL (and URLs of listed financial/public sites) only to decide, locally in the browser,
+    whether to show a status badge; these URLs are never stored or sent anywhere. Browser storage is used only
+    to hold display state on this device and is removed when the extension is uninstalled.</p>
+    <p>Permissions: <code>nativeMessaging</code> (talk to the local app), <code>storage</code> (local display
+    state), <code>activeTab</code> (read the current tab only when the popup is opened), and host permissions
+    limited to Korean financial/public sites (show the badge there). The broad <code>tabs</code> permission is
+    not used.</p>
+    <p class="muted">Last updated: 2026-10-15. Contact: <strong>tms05112@naver.com</strong></p>
+  </div>
+</div>
+</body>
+</html>

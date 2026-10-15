@@ -1,0 +1,173 @@
+/* 앱 화면과 같은 색 */
+:root {
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --green: #16a34a;
+  --amber: #d97706;
+  --gray: #6b7280;
+  --ink: #111827;
+  --bg: #ffffff;
+  --soft: #f1f3f6;
+  --soft-dark: #e5e7eb;
+  --amber-bg: #fff7ed;
+  --amber-line: #fed7aa;
+  --red: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e5e7eb;
+    --bg: #1f2937;
+    --soft: #374151;
+    --soft-dark: #4b5563;
+    --gray: #9ca3af;
+    --amber-bg: #3b2a14;
+    --amber-line: #92400e;
+    --red: #f87171;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 320px;
+  margin: 0;
+  padding: 14px 16px 16px;
+  font: 13px/1.5 "맑은 고딕", "Malgun Gothic", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gray);
+  flex: none;
+}
+
+.dot.on { background: var(--green); }
+.dot.busy { background: var(--accent); animation: pulse 1s ease-in-out infinite alternate; }
+
+@keyframes pulse { to { opacity: 0.3; } }
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--gray);
+  white-space: pre-line;
+}
+
+.prompt {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--amber-line);
+  border-radius: 8px;
+  background: var(--amber-bg);
+}
+
+.prompt strong {
+  display: block;
+  color: var(--amber);
+}
+
+.buttons {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.primary,
+.secondary {
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.primary { background: var(--accent); color: #fff; }
+.primary:hover:not(:disabled) { background: var(--accent-dark); }
+.secondary { background: var(--soft); color: var(--ink); }
+.secondary:hover:not(:disabled) { background: var(--soft-dark); }
+
+button:focus { outline: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hint,
+.warning {
+  margin: 10px 0 0;
+  color: var(--gray);
+  font-size: 12px;
+}
+
+.result {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--soft-dark);
+}
+
+.result p { margin: 0; }
+.result.ok p { color: var(--green); }
+.result.fail p { color: var(--red); }
+
+.result ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--gray);
+  font-size: 12px;
+}
+
+.link {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-align: left;
+}
+
+.link:hover { text-decoration: underline; }
+
+.setup {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.setup p { margin: 0 0 4px; }
+
+.setup ol {
+  margin: 0;
+  padding-left: 18px;
+}

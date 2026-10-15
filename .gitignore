@@ -1,0 +1,11 @@
+# 빌드 산출물
+/bin/
+/dist/
+
+# 포터블 Inno Setup (배포 묶음 만들 때만 필요, 저장소엔 안 올림)
+/tools/
+
+# 임시/개인 설정
+*.user
+Thumbs.db
+.DS_Store
