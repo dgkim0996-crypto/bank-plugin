@@ -20,7 +20,7 @@ namespace BankMode
         // chrome-extension\manifest.json의 "key"에서 나온 개발용(압축 해제 로드) 확장 ID. 키를 바꾸면 이 값도 바꿔야 함
         public const string ExtensionId = "pmjnagnjdiidgplgfeckafeamdiflkbe";
         // 웹스토어에 공개하면 ID가 따로 배정된다. 그 ID를 여기 넣거나 extension-ids.txt에 적으면 그 확장도 허용된다
-        public const string PublishedExtensionId = "";
+        public const string PublishedExtensionId = "finlhbijjakfdccdbibdccfkljkgbjck";
         public static string Origin { get { return "chrome-extension://" + ExtensionId + "/"; } }
 
         const string RegPath = @"Software\Google\Chrome\NativeMessagingHosts\" + Name;
