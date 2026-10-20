@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "은행 모드",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "은행 보안 프로그램을 크롬 버튼 하나로 켜고 끕니다. 은행 모드(BankMode) 앱이 필요해요.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkD3O0ynka4oEKvs4IjUCteRWX4WN/Da84sY+J124lid3VMbn2QZ7Mt60NpjldUiBzIolyR5YgEAJeIKAK1OUfI1BJu8+Xr8OtUJqJWvKvoo3T1sQKDHZ/tcR+33PW0ENpTJ805u3ZZrkXMbaF6sJgOm5O7A/2QrwU47hFXASBEin9Vb+fsfkw3SxOSUKRGbPsvXLsF/lIn355dyIaVKUXyZGWsmSRXYmggei0yfwxRBJmFubGpQqpL1o5Mdj2QLPfY46GpmQSnRMAV7ZD2hc8UALkKwSz+tYjcfPPWrA3Pdo3Pw8A6ac6ModifHt5jSGhhHPXTYtBM6MSkVINjqdcwIDAQAB",
   "minimum_chrome_version": "110",

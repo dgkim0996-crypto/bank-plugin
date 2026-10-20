@@ -45,9 +45,9 @@ export function siteFor(url, sites) {
 // 크롬의 Native Messaging 오류(영문)를 사용자에게 보여 줄 말로
 export function friendlyError(e) {
   const m = String((e && e.message) || e || '');
-  if (/not found/i.test(m)) return "은행 모드 앱과 연결되지 않았어요. 앱 아래쪽의 '크롬 확장 연결'을 눌러 주세요.";
-  if (/forbidden/i.test(m)) return "이 확장 프로그램이 앱에 등록되지 않았어요. 앱에서 '크롬 확장 연결'을 다시 눌러 주세요.";
-  if (/exited|communicating/i.test(m)) return "은행 모드 앱이 응답 없이 끝났어요. 앱 폴더를 옮겼다면 앱에서 '크롬 확장 연결'을 다시 눌러 주세요.";
+  if (/not found/i.test(m)) return '은행 모드 앱이 설치되지 않았거나 크롬과 연결되지 않았어요.';
+  if (/forbidden/i.test(m)) return "설치된 앱이 이 확장을 아직 모르는 버전이에요. 아래 설치 파일로 최신 앱을 설치하거나, 앱에서 '크롬 확장 연결'을 다시 눌러 주세요.";
+  if (/exited|communicating/i.test(m)) return "은행 모드 앱이 응답 없이 끝났어요. 앱 폴더를 옮겼다면 아래 설치 파일로 다시 설치하거나, 앱에서 '크롬 확장 연결'을 다시 눌러 주세요.";
   return m || '알 수 없는 오류가 났어요.';
 }
 
