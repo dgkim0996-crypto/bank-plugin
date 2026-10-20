@@ -28,6 +28,7 @@ namespace BankMode
             string cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "";
             if (cmd == "--elevated") return Elevated(args);
             if (cmd == "--uninstall") return Uninstall(args);
+            if (cmd == "--register-host") return RegisterHost();
             if (cmd == "--scan") return Scan(args.Length > 1 ? args[1] : Path.Combine(Store.Dir, "scan.txt"));
             if (cmd == "--native-host" || cmd.StartsWith("chrome-extension://")) return NativeHost.Run();
 
@@ -121,6 +122,13 @@ namespace BankMode
             }
             catch { }
             return 0;
+        }
+
+        // 설치 프로그램이 부르는 모드: 크롬 확장이 이 앱을 찾을 수 있게 등록 (내 계정 레지스트리라 관리자 권한 불필요)
+        static int RegisterHost()
+        {
+            try { NativeHost.Register(); return 0; }
+            catch { return 1; }
         }
 
         static int Scan(string outPath)

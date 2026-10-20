@@ -8,9 +8,19 @@ Veraport, Delfino, AnySign, MagicLine, SignKorea, IPinside, MarkAny 등)을
 - 창을 닫으면 앱도 완전히 종료돼서 평소 자원을 쓰지 않음
 - 크롬 툴바 버튼(확장 프로그램)으로도 상태 확인·켜기·끄기 가능 — 은행 사이트에 들어가면 꺼져 있다고 알려 줌
 
+## 다운로드 · 설치
+
+1. **[BankMode-Setup.exe 다운로드](https://github.com/dgkim0996-crypto/bank-plugin/releases/latest/download/BankMode-Setup.exe)** → 실행
+   - "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요 (코드 서명 인증서가 아직 없어서 뜨는 안내예요)
+   - 관리자 권한 없이 내 계정에만 설치되고, **크롬 확장 연결까지 자동으로** 끝나요
+2. 크롬 웹스토어에서 **[은행 모드 확장 프로그램](https://chromewebstore.google.com/detail/finlhbijjakfdccdbibdccfkljkgbjck)** 설치
+3. 툴바의 퍼즐 조각 아이콘에서 '은행 모드' 옆 핀을 눌러 버튼을 고정
+
+> 지난 버전은 [Releases](https://github.com/dgkim0996-crypto/bank-plugin/releases)에 있어요.
+
 ## 사용법
 
-1. `bin\BankMode.exe` 실행
+1. 시작 메뉴의 **은행 모드** 실행 (직접 빌드했다면 `bin\BankMode.exe`)
 2. **처음 한 번 `끄기`** → 부팅할 때 보안 프로그램이 저절로 켜지지 않게 막아 둡니다 (관리자 확인 창에서 '예')
 3. 은행 갈 때 **`은행 모드 켜기`** → 보안 프로그램이 전부 켜지고, 고른 은행 사이트가 열립니다
 4. 은행 업무가 끝나면 창 닫기 → "끄고 닫을까요?" → **예**
@@ -83,7 +93,11 @@ AhnLab Safe Transaction, nProtect 같은 키보드 보안 프로그램은 **자�
 크롬 확장은 보안상 윈도우 서비스나 다른 프로그램을 직접 켜고 끌 수 없어서,
 확장 버튼이 이 앱을 불러 일을 시키는 방식(크롬 Native Messaging)입니다.
 
-### 설치 (처음 한 번)
+### 설치
+
+**일반 사용자**: 위 '다운로드 · 설치'대로 설치 프로그램 + 웹스토어 확장을 깔면 끝이에요. 연결은 설치 프로그램이 자동으로 해요.
+
+**개발자용 (압축해제 로드)**:
 
 1. 크롬 주소창에 `chrome://extensions` 입력
 2. 오른쪽 위 **개발자 모드** 켜기
@@ -160,6 +174,7 @@ powershell -ExecutionPolicy Bypass -File build-dist.ps1
 ### 설치 프로그램 (`BankMode-Setup.exe`)
 
 - **관리자 권한 없이** 내 계정에만 설치됩니다 (크롬 연결·설정이 사용자 단위라 이 방식이 맞음)
+- 설치하면서 **크롬 확장 연결을 자동 등록**합니다 (`--register-host`). 개발용·웹스토어 확장 ID를 둘 다 허용해요
 - 제거하면 **은행 모드가 바꿔 둔 자동 시작 설정을 자동으로 원래대로 되돌립니다** (`--uninstall`).
   되돌릴 서비스가 있으면 이때 관리자 확인 창이 한 번 떠요. 그래서 제거 뒤에도 은행 사이트가 정상 동작합니다
 - 설정·상태 파일(`%APPDATA%\BankMode`)은 제거해도 남겨 둡니다 (직접 지워도 됨)

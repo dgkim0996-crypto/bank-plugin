@@ -56,6 +56,8 @@ Name: "{group}\{#AppName} 제거"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\은행 모드 켜기"; Filename: "{app}\{#ExeName}"; Parameters: "--on"; Tasks: desktopicon
 
 [Run]
+; 크롬 확장이 이 앱을 찾을 수 있게 자동 등록 (내 계정 레지스트리, 관리자 권한 불필요)
+Filename: "{app}\{#ExeName}"; Parameters: "--register-host"; Flags: runhidden waituntilterminated
 Description: "{#AppName} 지금 실행"; Filename: "{app}\{#ExeName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]

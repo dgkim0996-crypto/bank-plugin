@@ -22,6 +22,7 @@ namespace BankMode
         // 웹스토어에 공개하면 ID가 따로 배정된다. 그 ID를 여기 넣거나 extension-ids.txt에 적으면 그 확장도 허용된다
         public const string PublishedExtensionId = "finlhbijjakfdccdbibdccfkljkgbjck";
         public static string Origin { get { return "chrome-extension://" + ExtensionId + "/"; } }
+        public const string StoreUrl = "https://chromewebstore.google.com/detail/" + PublishedExtensionId;
 
         const string RegPath = @"Software\Google\Chrome\NativeMessagingHosts\" + Name;
         static string ManifestPath { get { return Path.Combine(Store.Dir, Name + ".json"); } }

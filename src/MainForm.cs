@@ -569,18 +569,9 @@ namespace BankMode
 
                 NativeHost.Register();
                 Log("크롬 확장과 연결했어요 — 크롬 툴바의 은행 모드 버튼으로 켜고 끌 수 있어요");
-                string folder = NativeHost.ExtensionFolder();
-                string msg = "크롬 확장과 연결했어요.\n\n확장 프로그램을 아직 설치하지 않았다면:\n" +
-                             "1. 크롬 주소창에 chrome://extensions 입력\n" +
-                             "2. 오른쪽 위 '개발자 모드' 켜기\n" +
-                             "3. '압축해제된 확장 프로그램 로드' → 아래 폴더 선택\n\n";
-                if (folder == null)
-                {
-                    MessageBox.Show(this, msg + "(chrome-extension 폴더를 찾지 못했어요. 은행 모드 폴더 안에 있어요)", WindowTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-                if (MessageBox.Show(this, msg + folder + "\n\n이 폴더를 열까요?", WindowTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    using (Process.Start("explorer.exe", "\"" + folder + "\"")) { }
+                if (MessageBox.Show(this, "크롬 확장과 연결했어요.\n\n확장 프로그램을 아직 설치하지 않았다면 크롬 웹스토어에서 '은행 모드'를 설치하세요.\n\n웹스토어 페이지를 열까요?",
+                        WindowTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                    using (Process.Start(new ProcessStartInfo(NativeHost.StoreUrl) { UseShellExecute = true })) { }
             }
             catch (Exception ex) { Log("  ! 크롬 확장 연결 실패: " + ex.Message); }
         }
