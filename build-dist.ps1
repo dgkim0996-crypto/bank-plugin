@@ -24,8 +24,15 @@ $tmp = Join-Path $env:TEMP ("bankmode-ext-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
     Copy-Item (Join-Path $ext '*') $tmp -Recurse -Force
+    $catalog = Get-Content (Join-Path $ext 'sites.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    $origins = @($catalog | ForEach-Object {
+        $u = [Uri]$_.url
+        $hostName = $u.Host -replace '^www\.', ''
+        "*://*.$hostName/*"
+    } | Sort-Object -Unique)
     $mPath = Join-Path $tmp 'manifest.json'
     $m = Get-Content $mPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $m.host_permissions = $origins
     if ($m.PSObject.Properties.Name -contains 'key') {
         $m.PSObject.Properties.Remove('key')
         Write-Host "  업로드본에서 개발용 key 제거"
@@ -33,15 +40,21 @@ try {
     # Chrome은 \uXXXX 이스케이프된 JSON도 받는다. manifest.json은 BOM 없이 저장(BOM 있으면 크롬이 거부할 수 있음)
     [IO.File]::WriteAllText($mPath, ($m | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding $false))
     $zip = Join-Path $dist ("bankmode-extension-store-v$ver.zip")
+    Get-ChildItem $dist -Filter 'bankmode-extension-store-v*.zip' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -ne $zip } | Remove-Item -Force
     if (Test-Path $zip) { Remove-Item $zip -Force }
+    $package = Join-Path $dist 'extension-package'
+    if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+    New-Item -ItemType Directory -Force $package | Out-Null
+    Copy-Item (Join-Path $tmp '*') $package -Recurse -Force
     # zip 항목 경로는 반드시 정방향 슬래시('icons/icon16.png')여야 함.
     # Compress-Archive는 역슬래시를 넣으므로 ZipArchive로 직접 만든다.
     Add-Type -AssemblyName System.IO.Compression | Out-Null
     $fs = [IO.File]::Open($zip, [IO.FileMode]::Create)
     $arch = New-Object IO.Compression.ZipArchive($fs, [IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach ($file in Get-ChildItem $tmp -Recurse -File) {
-            $rel = $file.FullName.Substring($tmp.Length).TrimStart('\', '/').Replace('\', '/')
+        foreach ($file in Get-ChildItem $package -Recurse -File) {
+            $rel = $file.FullName.Substring($package.Length).TrimStart('\', '/').Replace('\', '/')
             $entry = $arch.CreateEntry($rel, [IO.Compression.CompressionLevel]::Optimal)
             $es = $entry.Open()
             $bytes = [IO.File]::ReadAllBytes($file.FullName)
@@ -60,7 +73,7 @@ foreach ($p in (Join-Path $root 'tools\InnoSetup\ISCC.exe'), "${env:ProgramFiles
     if (Test-Path $p) { $iscc = $p; break }
 }
 if ($iscc) {
-    & $iscc (Join-Path $root 'installer\BankMode.iss')
+    & $iscc "/DAppVersion=$ver" (Join-Path $root 'installer\BankMode.iss')
     if ($LASTEXITCODE -ne 0) { throw "설치 프로그램 컴파일 실패" }
     Write-Host "  생성: $(Join-Path $dist 'BankMode-Setup.exe')"
 } else {

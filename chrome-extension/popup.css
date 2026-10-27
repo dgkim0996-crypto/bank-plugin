@@ -66,6 +66,7 @@ h1 {
 }
 
 .dot.on { background: var(--green); }
+.dot.partial { background: var(--amber); }
 .dot.busy { background: var(--accent); animation: pulse 1s ease-in-out infinite alternate; }
 
 @keyframes pulse { to { opacity: 0.3; } }
@@ -157,6 +158,73 @@ button:disabled {
 }
 
 .link:hover { text-decoration: underline; }
+
+.site-access {
+  margin-top: 10px;
+  padding: 9px 10px 6px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.site-access summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.site-access summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.site-access p { margin: 0; color: var(--gray); font-size: 12px; }
+
+.site-access > p { margin-top: 6px; }
+
+.site-permission-list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--soft-dark);
+}
+
+.site-detail {
+  display: grid;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.site-detail strong,
+.site-detail span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-detail span { color: var(--gray); font-size: 11px; }
+.site-detail .site-permission-status { color: var(--gray); }
+
+.permission-button {
+  flex: none;
+  min-width: 48px;
+  padding: 4px 7px;
+  border: 1px solid var(--soft-dark);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.permission-button:hover:not(:disabled) { border-color: var(--accent); }
+.permission-button:focus { outline: none; }
+.permission-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.permission-button:disabled { color: var(--gray); cursor: default; }
 
 .setup {
   margin-top: 12px;

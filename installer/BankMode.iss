@@ -1,5 +1,5 @@
 ; 은행 모드 설치 프로그램 (Inno Setup 6)
-; 빌드: ISCC.exe installer\BankMode.iss  (먼저 build.ps1로 bin\BankMode.exe가 있어야 함)
+; 빌드: build-dist.ps1  (확장 패키지·앱 버전을 맞춰 만든 뒤 Inno Setup으로 컴파일)
 ; 결과: dist\BankMode-Setup.exe
 ;
 ; 관리자 권한 없이 설치되는 '사용자 설치'입니다.
@@ -8,7 +8,9 @@
 ;          (되돌릴 서비스가 있으면 이때 관리자 확인 창이 한 번 뜸)
 
 #define AppName "은행 모드"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+#define AppVersion "1.0.2"
+#endif
 #define AppPublisher "BankMode"
 #define ExeName "BankMode.exe"
 
@@ -46,7 +48,7 @@ Name: "desktopicon"; Description: "바탕화면에 '은행 모드 켜기' 바로
 [Files]
 Source: "..\bin\{#ExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
-Source: "..\chrome-extension\*"; DestDir: "{app}\chrome-extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\extension-package\*"; DestDir: "{app}\chrome-extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; 시작 메뉴: 창 열기

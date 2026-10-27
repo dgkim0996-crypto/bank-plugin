@@ -167,6 +167,7 @@ namespace BankMode
             return new Dictionary<string, object>
             {
                 { "on", sum.On },
+                { "partial", sum.Partial },
                 { "running", sum.Running },
                 { "managed", sum.Managed },
                 { "found", sum.Found },

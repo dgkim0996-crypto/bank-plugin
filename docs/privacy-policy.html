@@ -96,7 +96,7 @@
 <div class="wrap">
   <header>
     <h1>개인정보처리방침</h1>
-    <p class="meta">크롬 확장 프로그램 「은행 모드」 · 최종 수정일 2026-10-15</p>
+    <p class="meta">크롬 확장 프로그램 「은행 모드」 · 최종 수정일 2026-10-27</p>
   </header>
 
   <div class="card tldr">
@@ -117,7 +117,7 @@
     <table>
       <tr><th>정보</th><th>용도</th><th>외부 전송</th></tr>
       <tr>
-        <td>현재 보고 있는 탭의 주소, 그리고 <code>manifest.json</code>에 등록된 금융·공공 사이트 탭의 주소</td>
+        <td>현재 보고 있는 탭의 주소, 그리고 이용자가 접근을 허용한 등록 사이트 탭의 주소</td>
         <td>지금 화면이 은행/공공 사이트인지 <strong>브라우저 안에서 비교</strong>해, 보안 프로그램이 꺼져 있으면 아이콘에 알림 배지를 표시</td>
         <td>안 함 (앱에도 보내지 않음)</td>
       </tr>
@@ -132,17 +132,18 @@
         <td>안 함</td>
       </tr>
     </table>
-    <p class="muted">탭 주소는 은행 사이트인지 판단하는 데만 쓰이며, 기록되거나 어디로도 전송되지 않습니다.
+    <p class="muted">기본 등록 사이트는 확장 설치 권한으로 접근하고, 이용자가 추가한 사이트는 팝업에서 해당 도메인 접근을 허용한 뒤에만 접근합니다. 탭 주소는 은행 사이트인지 판단하는 데만 쓰이며, 기록되거나 어디로도 전송되지 않습니다.
     방문 기록 전체를 읽지 않습니다(<code>tabs</code> 권한을 사용하지 않음).</p>
   </div>
 
   <div class="card">
     <h2>3. 외부 서버·제3자·추적</h2>
     <ul>
-      <li>외부 서버로의 통신이 <strong>전혀 없습니다</strong> (확장 코드에 네트워크 요청이 없습니다).</li>
+      <li>크롬 확장 프로그램은 외부 서버로 통신하지 않습니다.</li>
+      <li>Windows 앱은 새 버전 확인을 위해 GitHub 공개 Releases API에 하루 최대 한 번 요청할 수 있습니다. 이 요청에는 설치 경로, 설정, 보안 프로그램 상태, 사이트 목록 등 로컬 데이터가 포함되지 않습니다. GitHub는 네트워크 요청의 일반 연결 정보를 처리할 수 있습니다.</li>
       <li>광고·애널리틱스·추적 도구·쿠키를 <strong>사용하지 않습니다.</strong></li>
-      <li>데이터를 제3자와 <strong>공유하거나 판매하지 않습니다.</strong></li>
-      <li>통신 상대는 오직 같은 컴퓨터에 설치된 「은행 모드」 앱뿐입니다.</li>
+      <li>로컬 데이터를 제3자와 <strong>공유하거나 판매하지 않습니다.</strong></li>
+      <li>확장 프로그램의 통신 상대는 같은 컴퓨터의 「은행 모드」 앱뿐입니다.</li>
     </ul>
   </div>
 
@@ -180,6 +181,7 @@
     <h2>Privacy Policy (English summary)</h2>
     <p><strong>This extension does not collect, store remotely, or transmit any personal or user data.</strong>
     It has no network requests, no analytics, no ads, no trackers, and no third-party sharing.</p>
+    <p>The companion Windows app may check GitHub's public Releases API at most once every 24 hours to show an update link. The request does not include local settings, installed security modules, file paths, or a device identifier. GitHub may process ordinary connection metadata such as the request IP address.</p>
     <p>The extension communicates only with the companion <strong>BankMode</strong> application installed on the
     same computer, over the operating system's Chrome Native Messaging — never over the internet. It uses the
     current tab's URL (and URLs of listed financial/public sites) only to decide, locally in the browser,
@@ -189,7 +191,7 @@
     state), <code>activeTab</code> (read the current tab only when the popup is opened), and host permissions
     limited to Korean financial/public sites (show the badge there). The broad <code>tabs</code> permission is
     not used.</p>
-    <p class="muted">Last updated: 2026-10-15. Contact: <strong>tms05112@naver.com</strong></p>
+    <p class="muted">Last updated: 2026-10-27. Contact: <strong>tms05112@naver.com</strong></p>
   </div>
 </div>
 </body>

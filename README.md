@@ -49,7 +49,9 @@ Veraport, Delfino, AnySign, MagicLine, SignKorea, IPinside, MarkAny 등)을
 - 서비스를 **'사용 안 함'** 으로 바꾸므로 부팅 때는 물론 **은행 사이트가 불러도 켜지지 않습니다**.
   켜기를 누르면 다시 '수동'으로 풀고 시작하므로 은행 업무엔 지장이 없어요
 - **커널 드라이버는 건드리지 않습니다** (원래 대부분 '수동'이라 필요할 때만 올라옴)
-- 처음 상태는 `%APPDATA%\BankMode\state.json`에 기록되고, **`원래대로 되돌리기`** 로 언제든 복원됩니다
+- 관리자 권한이 필요한 작업은 변경할 항목을 먼저 보여 줍니다. 동의해야 UAC 확인 창이 이어서 뜨고, 취소하면 작업을 시작하지 않습니다
+- 일부 모듈이 자체 보호로 꺼지지 않으면 `남은 항목 다시 끄기`로 아직 실행 중인 항목만 다시 시도할 수 있습니다
+- 처음 상태와 BankMode가 마지막으로 적용한 값은 `%APPDATA%\BankMode\state.json`에 원자적으로 기록됩니다. 변경 직전 저널도 저장하므로 작업 중 앱이 종료돼도 다음 작업에서 상태를 확인해 이어서 복구합니다. **`원래대로 되돌리기`** 는 그 뒤 사용자가 값을 바꾸지 않은 항목만 복원하고, 달라진 항목은 현재 설정을 보존하며 기록 창에 알려 줍니다
 - 서비스 제어가 필요할 때만 관리자 권한을 요청합니다. 이미 다 켜져 있으면 확인 창도 뜨지 않아요
 
 ### 안 꺼질 수 있는 것
@@ -80,13 +82,19 @@ AhnLab Safe Transaction, nProtect 같은 키보드 보안 프로그램은 **자�
 
 `%APPDATA%\BankMode\settings.json`
 
+앱의 **`사이트 관리·분류 미리보기`** 화면에서 사이트를 추가·수정·삭제하고, 현재 서비스·시작프로그램·프로세스 경로가 어떤 분류 규칙과 일치하는지 미리 볼 수 있습니다.
+
 - `Sites` — 켠 다음 열 사이트 목록 (증권사 등 추가 가능)
 - `Vendors` — 보안 프로그램 분류 규칙. `Match`에 적힌 문자열이 실행 파일 경로에 있으면 그 모듈로 인식
   (예: `"AhnLab/Safe Transaction"` → `C:\Program Files\AhnLab\Safe Transaction\...`).
-  백신 등과 겹치지 않도록 되도록 **폴더 경로**로 적고, 이름만 적는 건 그 이름이 다른 프로그램과 안 겹칠 때만 하세요
+  백신 등과 겹치지 않도록 되도록 **폴더 경로**로 적으세요. 와일드카드·상위 폴더 이동·너무 짧은 단일 이름은 무시되며, 무시된 패턴은 앱 기록에 표시됩니다. 관리자 확인 창에는 변경 대상의 실행 경로도 나옵니다
 - `Excluded` — 체크 해제한(관리하지 않을) 모듈
 
 고친 뒤 저장하고 `새로고침`을 누르면 반영됩니다.
+
+**`진단 정보 저장`** 은 동의를 받은 뒤 현재 탐지 상태와 최근 로그를 텍스트로 내보냅니다. 사용자 프로필 경로와 URL·이메일은 가리지만, 공유 전 파일 내용을 직접 확인하세요.
+
+앱은 새 버전 안내를 위해 GitHub 공개 Releases API를 하루 최대 한 번 확인합니다. 이 요청에는 PC의 설정이나 은행 보안 프로그램 상태를 보내지 않습니다.
 
 ## 크롬 툴바 버튼 (확장 프로그램)
 
@@ -115,7 +123,7 @@ AhnLab Safe Transaction, nProtect 같은 키보드 보안 프로그램은 **자�
 - 버튼을 누르면 팝업에 **켜짐/꺼짐, 실행 중인 개수, 메모리**와 `은행 모드 켜기` / `끄기` 버튼이 나옵니다
 - 은행 사이트에서 열면 "은행 모드가 꺼져 있어요 — 켤까요?"가 함께 나옵니다
 - 관리자 확인 창이 뜨면 팝업이 닫히지만 작업은 계속됩니다. 끝나면 버튼 배지가 바뀝니다
-- 배지 뜻: **ON**(초록) 켜져 있음 · **!**(주황) 은행 사이트인데 꺼져 있음 · **?**(회색) 앱과 연결 안 됨 · **…**(파랑) 켜고 끄는 중
+- 배지 뜻: **ON**(초록) 모두 켜짐 · **~**(주황) 일부만 켜짐 · **!**(주황) 은행 사이트인데 꺼져 있음 · **?**(회색) 앱과 연결 안 됨 · **…**(파랑) 켜고 끄는 중
 - 은행 사이트는 설정 파일의 `Sites` 목록을 따릅니다. `www.kbstar.com`을 등록하면 `obank.kbstar.com` 같은 하위 주소도 포함됩니다
 
 확장은 평소에 앱을 주기적으로 부르지 않습니다. **팝업을 열 때와 은행 사이트에 들어갈 때만** 잠깐 앱을 실행해
@@ -128,11 +136,12 @@ AhnLab Safe Transaction, nProtect 같은 키보드 보안 프로그램은 **자�
 - `nativeMessaging` — 은행 모드 앱과 통신
 - `storage` — 상태·사이트 목록 보관
 - `activeTab` — 팝업을 열 때 **지금 보고 있는 탭**만 확인 (은행 사이트인지 판단·새로고침)
-- `host_permissions` — `manifest.json`에 적힌 **금융·공공 도메인 목록에서만** 자동으로 "꺼져 있어요" 배지를 띄움.
-  그래서 설치 경고가 "방문 기록 읽기"가 아니라 "이 사이트들에서 데이터 읽기"로 좁혀집니다
+- 기본 사이트 권한은 `chrome-extension\sites.json`에서 만들어집니다. 추가 사이트는 팝업의 **사이트별 자동 배지 권한** 목록에서 도메인별로 허용하거나 해제할 수 있습니다.
+  `tabs` 권한은 쓰지 않고, 허용된 등록 사이트에서만 자동 배지를 띄웁니다
+  사이트 목록에서 삭제한 추가 권한은 팝업에 남아 해제할 수 있습니다. 기본 권한은 확장 업데이트 전까지 유지된다고 표시됩니다.
 
-> 목록에 없는 은행/증권 사이트는 **자동 배지만** 안 뜰 뿐, 팝업을 눌러 켜고 끄는 건 어디서나 됩니다.
-> 자주 가는 사이트를 자동 배지에 넣고 싶으면 `manifest.json`의 `host_permissions`에 `*://*.도메인/*`을 추가하세요.
+> 목록에 없는 은행/증권 사이트는 `%APPDATA%\BankMode\settings.json`의 `Sites`에 추가한 뒤, 확장 팝업의 사이트별 권한 목록에서 그 도메인만 허용하세요.
+> 허용하면 해당 사이트에서 자동 배지를 볼 수 있습니다. 팝업 버튼으로 켜고 끄는 기능은 사이트 권한 없이도 어디서나 됩니다.
 
 ## 빌드
 
@@ -141,9 +150,13 @@ AhnLab Safe Transaction, nProtect 같은 키보드 보안 프로그램은 **자�
 ```
 src\Engine.cs        탐색(서비스·시작프로그램·프로세스) + 켜기/끄기/되돌리기 (앱 창·크롬 확장 공용)
 src\MainForm.cs      화면
+src\SettingsAssistantDialog.cs 사이트 관리 및 분류 미리보기
+src\DiagnosticsReport.cs 동의 기반 진단 정보 내보내기
+src\UpdateChecker.cs  하루 한 번 새 버전 확인
 src\NativeHost.cs    크롬 확장용 Native Messaging 호스트(--native-host) + 크롬에 호스트 등록
 src\Program.cs       진입점, 관리자 권한 단계(--elevated), 제거 복원(--uninstall), 진단(--scan)
 chrome-extension\    크롬 확장 (Manifest V3). 아이콘은 없으면 build.ps1이 만들어 줌
+chrome-extension\sites.json  앱과 확장이 함께 읽는 기본 사이트 목록
 installer\           Inno Setup 설치 프로그램 스크립트(BankMode.iss)
 build-dist.ps1       배포 묶음(설치 프로그램 + 웹스토어용 확장 zip) 만들기
 test-host.ps1        크롬처럼 '4바이트 길이 + JSON'을 보내 호스트 응답 확인
@@ -167,8 +180,8 @@ powershell -ExecutionPolicy Bypass -File build-dist.ps1
 ```
 
 1. 앱 빌드 (`bin\BankMode.exe`)
-2. 크롬 웹스토어 업로드용 확장 zip (`dist\bankmode-extension-store-v1.0.0.zip`) — 개발용 key를 뺀 버전
-3. **Inno Setup**이 깔려 있으면 설치 프로그램 `dist\BankMode-Setup.exe` 까지 컴파일
+2. 크롬 웹스토어 업로드용 확장 zip (`dist\bankmode-extension-store-v1.0.2.zip`) — 개발용 key를 뺀 버전, 사이트 권한 목록은 `sites.json`에서 생성
+3. **Inno Setup**이 깔려 있으면 확장 버전과 맞춘 설치 프로그램 `dist\BankMode-Setup.exe` 까지 컴파일
    - 없으면: `winget install JRSoftware.InnoSetup` 또는 <https://jrsoftware.org/isdl.php> 로 설치 후 다시 실행
 
 ### 설치 프로그램 (`BankMode-Setup.exe`)
@@ -188,7 +201,7 @@ powershell -ExecutionPolicy Bypass -File build-dist.ps1
 일반 사용자는 웹스토어 밖의 확장을 설치하기 어렵기 때문에, 널리 쓰려면 웹스토어에 올려야 합니다.
 
 1. [크롬 개발자 대시보드](https://chrome.google.com/webstore/devconsole)에 가입 (최초 등록비 $5)
-2. `dist\bankmode-extension-store-v1.0.0.zip` 업로드 — 공개 범위는 전체 공개 또는 **'미등록(Unlisted)'**(링크 아는 사람만) 선택 가능
+2. `dist\bankmode-extension-store-v1.0.2.zip` 업로드 — 공개 범위는 전체 공개 또는 **'미등록(Unlisted)'**(링크 아는 사람만) 선택 가능
 3. 심사 통과 후, 대시보드에서 **배정된 확장 ID**를 복사
 4. 그 ID를 앱이 허용하도록 등록. 둘 중 하나:
    - 다시 빌드하지 않기: `%APPDATA%\BankMode\extension-ids.txt` 에 ID를 한 줄 적고, 앱에서 `크롬 확장 연결`을 다시 누름
@@ -200,9 +213,9 @@ powershell -ExecutionPolicy Bypass -File build-dist.ps1
 웹스토어는 **개인정보처리방침 URL**을 요구합니다. 초안이 [docs/privacy-policy.html](docs/privacy-policy.html)에 있어요
 (이 확장은 데이터를 수집·전송하지 않는다는 내용). 올리기 전에:
 
-1. 파일 안의 **연락처 이메일**(`[여기에 연락처 이메일을 적으세요]`)을 채우기
+1. 현재 파일의 연락처와 정책 내용을 검토
 2. 어디든 공개 웹에 호스팅 — 예: GitHub Pages(저장소의 `docs/` 폴더를 Pages로 켜면 `https://<아이디>.github.io/<저장소>/privacy-policy.html`), Netlify, 혹은 가진 웹사이트
-3. 그 URL을 개발자 대시보드의 '개인정보 보호' 항목에 입력
+3. 공개 URL을 개발자 대시보드의 '개인정보 보호' 항목에 입력
 
 > 앱은 **여러 확장 ID를 동시에 허용**합니다(개발용 + 공개용). 그래서 공개 전후로 확장이 계속 동작해요.
 > `nativeMessaging` 권한 때문에 심사가 길어질 수 있으니, 대시보드의 권한 사유 칸에 "같은 PC의 은행 모드 앱과 통신" 이라고 적어 두세요.
@@ -211,6 +224,9 @@ powershell -ExecutionPolicy Bypass -File build-dist.ps1
 
 - **코드 서명 인증서**: SmartScreen·백신 경고를 줄이려면 필요(연 비용, 하드웨어 토큰 보관)
 - **백신 오탐 신고**: '보안 프로그램을 끄고 프로세스를 종료'하는 동작이 악성코드와 비슷해 오탐될 수 있음 → V3·알약 등에 오탐 신고
-- ~~**권한 축소**~~ (완료): `tabs` 권한을 빼고 `activeTab` + 금융 도메인 `host_permissions`로 좁힘 → "방문 기록 읽기" 경고 없음
+- ~~**권한 축소**~~ (완료): `tabs` 권한을 쓰지 않고 기본 사이트만 설치 권한으로 선언. 추가 사이트는 팝업에서 해당 도메인 접근을 따로 허용
 - ~~**개인정보처리방침** 페이지~~ (초안 완료: [docs/privacy-policy.html](docs/privacy-policy.html)) — 연락처 이메일 채우고 공개 URL로 호스팅만 하면 됨
-- **다른 PC 테스트**: 지금 인식 규칙은 이 PC에 있는 모듈 + 공개 자료 기준. 다른 보안 프로그램 조합에서 검증 필요
+
+### Windows 릴리스 자동화와 코드 서명
+
+`v*` 태그를 올리면 GitHub Actions가 manifest 버전을 확인하고 Windows에서 설치 파일과 웹스토어 ZIP을 빌드해 GitHub Release에 첨부합니다. 코드 서명 인증서를 설정하지 않으면 설치 파일은 서명되지 않은 상태로 표시됩니다. 서명용 GitHub Actions secret 설정은 [릴리스·서명 안내](docs/release-and-signing.md)를 참고하세요. 이 자동화는 Chrome 웹스토어에 확장을 게시하지 않습니다.

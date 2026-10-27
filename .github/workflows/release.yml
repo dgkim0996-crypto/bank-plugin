@@ -1,0 +1,107 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate tag and clean output directory
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tagVersion = $env:RELEASE_TAG -replace '^v', ''
+          $manifest = Get-Content 'chrome-extension/manifest.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+          if ($tagVersion -ne $manifest.version) {
+            throw "Release tag $env:RELEASE_TAG does not match chrome-extension/manifest.json version $($manifest.version)."
+          }
+          if (Test-Path 'dist') { Remove-Item 'dist' -Recurse -Force }
+          New-Item -ItemType Directory -Path 'dist' | Out-Null
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build app, installer, and Web Store package
+        shell: pwsh
+        run: .\build-dist.ps1
+
+      - name: Sign installer when signing secrets are configured
+        shell: pwsh
+        env:
+          WINDOWS_PFX_BASE64: ${{ secrets.WINDOWS_PFX_BASE64 }}
+          WINDOWS_PFX_PASSWORD: ${{ secrets.WINDOWS_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfxBase64 = $env:WINDOWS_PFX_BASE64
+          $pfxPassword = $env:WINDOWS_PFX_PASSWORD
+          if ([string]::IsNullOrWhiteSpace($pfxBase64) -and [string]::IsNullOrWhiteSpace($pfxPassword)) {
+            Write-Host 'Signing secrets are not configured; publishing the installer unsigned.'
+            "Installer signing: skipped (secrets not configured)" >> $env:GITHUB_STEP_SUMMARY
+            exit 0
+          }
+          if ([string]::IsNullOrWhiteSpace($pfxBase64) -or [string]::IsNullOrWhiteSpace($pfxPassword)) {
+            throw 'Signing configuration is incomplete. Configure both WINDOWS_PFX_BASE64 and WINDOWS_PFX_PASSWORD, or remove both.'
+          }
+
+          $installer = (Resolve-Path 'dist/BankMode-Setup.exe').Path
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'bankmode-signing.pfx'
+          try {
+            $pfxBytes = [Convert]::FromBase64String($pfxBase64)
+            [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+            $signtoolRoot = "${env:ProgramFiles(x86)}/Windows Kits/10/bin"
+            $signtool = Get-ChildItem $signtoolRoot -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match '[\\/]x64[\\/]signtool\.exe$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1 -ExpandProperty FullName
+            if (-not $signtool) { throw 'signtool.exe was not found in the Windows SDK on this runner.' }
+
+            & $signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $pfxPath /p $pfxPassword $installer
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE." }
+            & $signtool verify /pa /all $installer
+            if ($LASTEXITCODE -ne 0) { throw "Signature verification failed with exit code $LASTEXITCODE." }
+            "Installer signing: signed and verified" >> $env:GITHUB_STEP_SUMMARY
+          }
+          finally {
+            Remove-Item $pfxPath -Force -ErrorAction SilentlyContinue
+            Remove-Variable pfxBase64, pfxPassword, pfxBytes -ErrorAction SilentlyContinue
+          }
+
+      - name: Confirm release files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = 'dist/BankMode-Setup.exe'
+          $extensionZip = Get-ChildItem 'dist/bankmode-extension-store-v*.zip' -File
+          if (-not (Test-Path $installer)) { throw "Missing release installer: $installer" }
+          if (@($extensionZip).Count -ne 1) { throw 'Expected exactly one Web Store extension ZIP in dist.' }
+          Get-Item $installer, $extensionZip.FullName | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BankMode-${{ github.ref_name }}
+          path: |
+            dist/BankMode-Setup.exe
+            dist/bankmode-extension-store-v*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/BankMode-Setup.exe
+            dist/bankmode-extension-store-v*.zip

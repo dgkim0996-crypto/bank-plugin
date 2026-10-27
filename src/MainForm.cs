@@ -37,11 +37,13 @@ namespace BankMode
         Settings settings;
         bool settingsBroken;
         List<BankModule> modules = new List<BankModule>();
-        bool busy, populating, refreshing, turnedOn, closeAfterOff;
+        bool busy, populating, refreshing, turnedOn, closeAfterOff, retryOffAvailable;
         int opFailures;
+        string latestReleaseUrl;
 
         Label lblDot, lblStatus, lblSub;
         Button btnOn, btnOff;
+        LinkLabel retryLink, updateLink;
         ComboBox cboSite;
         BufferedListView list;
         TextBox txtLog;
@@ -163,8 +165,16 @@ namespace BankMode
             links.Controls.Add(MakeLink("새로고침", async () => await Reload()));
             links.Controls.Add(MakeLink("바탕화면 바로가기 만들기", CreateShortcut));
             links.Controls.Add(MakeLink("설정 파일 열기", OpenSettingsFile));
+            links.Controls.Add(MakeLink("사이트 관리·분류 미리보기", ManageSettings));
+            links.Controls.Add(MakeLink("진단 정보 저장", ExportDiagnostics));
             links.Controls.Add(MakeLink("원래대로 되돌리기", async () => await DoRestore()));
             links.Controls.Add(MakeLink("크롬 확장 연결", ConnectChrome));
+            retryLink = MakeLink("남은 항목 다시 끄기", async () => await DoRetryOff());
+            retryLink.Visible = false;
+            links.Controls.Add(retryLink);
+            updateLink = MakeLink("업데이트 확인 중…", OpenLatestRelease);
+            updateLink.Visible = false;
+            links.Controls.Add(updateLink);
 
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 머리말
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, S(64)));   // 버튼
@@ -231,6 +241,8 @@ namespace BankMode
                 return;
             }
             timer.Start();
+            ShowRestoreNotice();
+            CheckForUpdatesAsync();
             if (autoOn) await DoOn();
             else Log("준비됐어요. 은행 업무 전에 '은행 모드 켜기'를 누르세요.");
         }
@@ -241,6 +253,8 @@ namespace BankMode
             settings = Store.LoadSettings(Store.SettingsPath, out err);
             settingsBroken = err != null;
             if (settingsBroken) Log("  ! 설정 파일을 읽지 못해 기본값으로 동작해요 (파일은 그대로 둠): " + err);
+            int invalidPatterns = Classifier.InvalidMatchCount(settings);
+            if (invalidPatterns > 0) Log("  ! 위험하거나 모호한 분류 패턴 " + invalidPatterns + "개를 건너뛰어요. 설정 파일에서 짧은 이름 대신 공급업체 폴더나 실행 파일 이름을 지정하세요.");
 
             populating = true;
             cboSite.Items.Clear();
@@ -357,9 +371,9 @@ namespace BankMode
             string sub;
             if (sum.On)
             {
-                lblDot.ForeColor = Green;
-                lblStatus.Text = "켜짐";
-                sub = sum.Running + "개 실행 중 · 메모리 " + Mb(sum.Memory) + " 사용";
+                lblDot.ForeColor = sum.Partial ? Amber : Green;
+                lblStatus.Text = sum.Partial ? "일부 켜짐" : "켜짐";
+                sub = sum.Running + "/" + sum.Managed + "개 모듈 실행 중 · 메모리 " + Mb(sum.Memory) + " 사용";
             }
             else
             {
@@ -391,7 +405,7 @@ namespace BankMode
             txtLog.AppendText((txtLog.TextLength > 0 ? "\r\n" : "") + DateTime.Now.ToString("HH:mm:ss") + "  " + line);
         }
 
-        Ctx NewCtx() { return new Ctx { Settings = settings, StatePath = Store.StatePath, Log = this.Log }; }
+        Ctx NewCtx() { return new Ctx { Settings = settings, StatePath = Store.StatePath, Log = this.Log, Owner = Handle }; }
 
         // ===================== 켜기 / 끄기 =====================
 
@@ -435,7 +449,9 @@ namespace BankMode
                 await FullRefresh();
                 long before = Managed().Sum(m => m.Memory);
                 var c = NewCtx();
-                if (!await Task.Run(() => Bank.TurnOff(c))) return;
+                bool done = await Task.Run(() => Bank.TurnOff(c));
+                retryOffAvailable = c.Failures > 0;
+                if (!done) return;
                 await Task.Delay(500);
                 await FullRefresh();
                 turnedOn = false;
@@ -448,20 +464,38 @@ namespace BankMode
                 Log(msg);
             }
             catch (Exception ex) { Log("  ! 오류: " + ex.Message); }
-            finally { SetBusy(false, null); }
+            finally { SetBusy(false, null); if (retryLink != null) retryLink.Visible = retryOffAvailable; }
+        }
+
+        async Task DoRetryOff()
+        {
+            if (busy || !retryOffAvailable) return;
+            SetBusy(true, "남은 항목 다시 끄는 중…");
+            opFailures = 0;
+            try
+            {
+                Log("아직 켜져 있거나 처리가 끝나지 않은 항목만 다시 꺼요");
+                await FullRefresh();
+                var c = NewCtx();
+                bool done = await Task.Run(() => Bank.RetryOff(c));
+                retryOffAvailable = !done || c.Failures > 0;
+                if (!done) return;
+                await Task.Delay(500);
+                await FullRefresh();
+                Log(c.Failures == 0 ? "남은 항목 재시도 완료" : "일부 항목은 아직 꺼지지 않았어요 (! 표시 참고)");
+            }
+            catch (Exception ex) { retryOffAvailable = true; Log("  ! 재시도 오류: " + ex.Message); }
+            finally { SetBusy(false, null); if (retryLink != null) retryLink.Visible = retryOffAvailable; }
         }
 
         async Task DoRestore()
         {
             var state = Store.LoadState(Store.StatePath);
-            if (state.Services.Count == 0 && state.RunApproved.Count == 0)
+            if (state.Services.Count == 0 && state.RunApproved.Count == 0 && state.PendingChanges.Count == 0)
             {
                 MessageBox.Show(this, "되돌릴 변경 사항이 없어요.\n아직 '끄기'로 바꾼 자동 시작 설정이 없습니다.", WindowTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            if (MessageBox.Show(this, "은행 모드가 바꾼 자동 시작 설정을 처음 상태로 되돌릴까요?\n\n다음 부팅부터 보안 프로그램이 예전처럼 저절로 켜져요.",
-                    WindowTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-
             SetBusy(true, "되돌리는 중…");
             opFailures = 0;
             try
@@ -525,6 +559,57 @@ namespace BankMode
                 Log("설정 파일을 열었어요. 사이트나 모듈을 고친 뒤 저장하고 '새로고침'을 누르세요.");
             }
             catch (Exception ex) { Log("  ! 설정 파일 열기 실패: " + ex.Message); }
+        }
+
+        void ManageSettings()
+        {
+            if (settingsBroken && MessageBox.Show(this,
+                "현재 설정 파일을 읽지 못해 기본 설정으로 열었습니다. 계속하면 잘못된 설정 파일을 새 설정으로 덮어씁니다. 진행할까요?",
+                WindowTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            if (!SettingsAssistantDialog.Show(this, settings)) return;
+            if (!settings.Sites.Any(s => string.Equals(s.Name, settings.LastSite, StringComparison.OrdinalIgnoreCase))) settings.LastSite = "";
+            bool wasBroken = settingsBroken;
+            settingsBroken = false;
+            try { Store.SaveSettings(Store.SettingsPath, settings); }
+            catch (Exception ex)
+            {
+                settingsBroken = wasBroken;
+                Log("  ! 사이트 설정 저장 실패: " + ex.Message);
+                return;
+            }
+            LoadSettings();
+            Log("사이트 목록을 저장했어요. 분류 미리보기는 현재 설정으로 다시 검색합니다.");
+        }
+
+        void ExportDiagnostics()
+        {
+            DiagnosticsReport.Save(this, settings, txtLog.Text);
+        }
+
+        void ShowRestoreNotice()
+        {
+            StateData state = Store.LoadState(Store.StatePath);
+            if (state.PendingChanges.Count > 0)
+                Log("  ! 이전 작업이 중간에 끝나 확인이 필요한 변경 " + state.PendingChanges.Count + "개가 있어요. '원래대로 되돌리기'에서 복구할 수 있습니다.");
+            else if (state.Services.Count > 0 || state.RunApproved.Count > 0)
+                Log("  - 원래대로 되돌릴 자동 시작 설정이 남아 있어요. 작업을 마친 뒤 '원래대로 되돌리기'를 누르세요.");
+        }
+
+        async void CheckForUpdatesAsync()
+        {
+            var update = await UpdateChecker.CheckAsync();
+            if (IsDisposed || update == null) return;
+            latestReleaseUrl = update.ReleaseUrl;
+            updateLink.Text = "새 버전 " + update.Latest + " 다운로드";
+            updateLink.Visible = true;
+            Log("새 버전 " + update.Latest + "을 사용할 수 있어요. 아래 다운로드 링크를 눌러 확인하세요.");
+        }
+
+        void OpenLatestRelease()
+        {
+            if (string.IsNullOrWhiteSpace(latestReleaseUrl)) return;
+            try { using (Process.Start(new ProcessStartInfo(latestReleaseUrl) { UseShellExecute = true })) { } }
+            catch (Exception ex) { Log("  ! 업데이트 페이지를 열지 못했어요: " + ex.Message); }
         }
 
         void CreateShortcut()

@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
+using System.Windows.Forms;
 
 namespace BankMode
 {
@@ -30,6 +31,30 @@ namespace BankMode
     {
         public string Name { get; set; }
         public string Url { get; set; }
+    }
+
+    public static class SiteCatalog
+    {
+        public static List<Site> Load()
+        {
+            string exeDir = Path.GetDirectoryName(Bank.ExePath);
+            string[] paths =
+            {
+                Path.Combine(exeDir, "chrome-extension", "sites.json"),
+                Path.GetFullPath(Path.Combine(exeDir, "..", "chrome-extension", "sites.json"))
+            };
+            foreach (string path in paths)
+            {
+                try
+                {
+                    if (!File.Exists(path)) continue;
+                    var sites = new JavaScriptSerializer().Deserialize<List<Site>>(File.ReadAllText(path, Encoding.UTF8));
+                    if (sites != null) return sites.Where(s => s != null && !string.IsNullOrWhiteSpace(s.Name) && !string.IsNullOrWhiteSpace(s.Url)).ToList();
+                }
+                catch { }
+            }
+            return new List<Site>();
+        }
     }
 
     public class Settings
@@ -88,27 +113,38 @@ namespace BankMode
             s.Vendors.Add(V("IPinside LWS Agent", "접속 PC 정보 확인 (부정 접속 방지, 인터리젠)", "IPinside", "Interezen"));
             s.Vendors.Add(V("MarkAny", "증명서·문서 출력 보안 (위변조 방지)", "MarkAny"));
 
-            s.Sites.Add(new Site { Name = "KB국민은행", Url = "https://www.kbstar.com" });
-            s.Sites.Add(new Site { Name = "신한은행", Url = "https://www.shinhan.com" });
-            s.Sites.Add(new Site { Name = "우리은행", Url = "https://www.wooribank.com" });
-            s.Sites.Add(new Site { Name = "하나은행", Url = "https://www.kebhana.com" });
-            s.Sites.Add(new Site { Name = "IBK기업은행", Url = "https://www.ibk.co.kr" });
-            s.Sites.Add(new Site { Name = "NH농협은행", Url = "https://banking.nonghyup.com" });
-            s.Sites.Add(new Site { Name = "홈택스", Url = "https://www.hometax.go.kr" });
-            s.Sites.Add(new Site { Name = "정부24", Url = "https://www.gov.kr" });
+            s.Sites.AddRange(SiteCatalog.Load());
             return s;
         }
     }
 
     // 끄기 전에 원래 설정을 기억해 두었다가 '원래대로 되돌리기'에 사용
+    public class PendingChange
+    {
+        public string Kind { get; set; }       // service / run
+        public string Key { get; set; }        // service name / location|value name
+        public string Before { get; set; }     // service start type / StartupApproved base64 (empty = absent)
+        public string After { get; set; }
+        public bool Restore { get; set; }
+        public bool Track { get; set; }
+    }
+
     public class StateData
     {
         public Dictionary<string, string> Services { get; set; }     // 서비스 이름 → auto / delayed-auto
         public Dictionary<string, string> RunApproved { get; set; }  // 위치|이름 → 원래 StartupApproved 값(base64, 없었으면 "")
+        // BankMode가 마지막으로 쓴 값을 기록해, 복원 전에 사용자가 바꾼 값은 덮어쓰지 않는다.
+        public Dictionary<string, string> ServiceApplied { get; set; }
+        public Dictionary<string, string> RunApplied { get; set; }
+        // Write-ahead journal. Each entry is persisted before touching SCM or StartupApproved.
+        public List<PendingChange> PendingChanges { get; set; }
         public StateData()
         {
             Services = new Dictionary<string, string>();
             RunApproved = new Dictionary<string, string>();
+            ServiceApplied = new Dictionary<string, string>();
+            RunApplied = new Dictionary<string, string>();
+            PendingChanges = new List<PendingChange>();
         }
     }
 
@@ -157,6 +193,9 @@ namespace BankMode
                     {
                         if (d.Services == null) d.Services = new Dictionary<string, string>();
                         if (d.RunApproved == null) d.RunApproved = new Dictionary<string, string>();
+                        if (d.ServiceApplied == null) d.ServiceApplied = new Dictionary<string, string>();
+                        if (d.RunApplied == null) d.RunApplied = new Dictionary<string, string>();
+                        if (d.PendingChanges == null) d.PendingChanges = new List<PendingChange>();
                         return d;
                     }
                 }
@@ -170,7 +209,22 @@ namespace BankMode
         static void SaveJson(string path, object o)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path, Pretty(new JavaScriptSerializer().Serialize(o)), new UTF8Encoding(false));
+            string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                byte[] bytes = new UTF8Encoding(false).GetBytes(Pretty(new JavaScriptSerializer().Serialize(o)));
+                using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+                if (File.Exists(path)) File.Replace(temp, path, null);
+                else File.Move(temp, path);
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+            }
         }
 
         // 사람이 메모장으로 고치기 쉽도록 들여쓰기
@@ -260,14 +314,38 @@ namespace BankMode
     {
         readonly List<KeyValuePair<string, VendorRule>> needles = new List<KeyValuePair<string, VendorRule>>();
 
+        public static int InvalidMatchCount(Settings settings)
+        {
+            if (settings == null || settings.Vendors == null) return 0;
+            return settings.Vendors.Where(v => v != null && v.Match != null)
+                .Sum(v => v.Match.Count(m => !SafeMatch(Scanner.Norm(m).Trim('\\', ' '))));
+        }
+
         public Classifier(Settings st)
         {
             foreach (var v in st.Vendors)
                 foreach (var m in v.Match)
                 {
-                    string n = "\\" + Scanner.Norm(m).Trim('\\', ' ');
-                    if (n.Length > 2) needles.Add(new KeyValuePair<string, VendorRule>(n, v));
+                    string raw = Scanner.Norm(m).Trim('\\', ' ');
+                    if (!SafeMatch(raw)) continue;
+                    string n = "\\" + raw;
+                    needles.Add(new KeyValuePair<string, VendorRule>(n, v));
                 }
+        }
+
+        static bool SafeMatch(string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(pattern) || pattern.Length < 3 || pattern.Contains("..") ||
+                pattern.IndexOfAny(new[] { '*', '?', ':', '"', '<', '>', '|' }) >= 0) return false;
+            var parts = pattern.Split('\\');
+            if (parts.Any(p => string.IsNullOrWhiteSpace(p) || p == ".")) return false;
+            string leaf = parts[parts.Length - 1];
+            if (leaf.Length < 3) return false;
+            // 단일 경로 조각은 일반적인 시스템 폴더 이름으로는 허용하지 않는다.
+            if (parts.Length == 1 && (leaf.Length < 7 || new[] {
+                "windows", "system32", "syswow64", "program files", "common files", "users", "appdata", "temp", "drivers"
+            }.Contains(leaf, StringComparer.OrdinalIgnoreCase))) return false;
+            return true;
         }
 
         public VendorRule Find(string path)
@@ -275,7 +353,16 @@ namespace BankMode
             if (string.IsNullOrEmpty(path)) return null;
             string p = Scanner.Norm(path);
             foreach (var kv in needles)
-                if (p.Contains(kv.Key)) return kv.Value;
+            {
+                int start = 0;
+                while ((start = p.IndexOf(kv.Key, start, StringComparison.Ordinal)) >= 0)
+                {
+                    int end = start + kv.Key.Length;
+                    // Path fragment must end at a path separator, file extension, or path end.
+                    if (end == p.Length || p[end] == '\\' || p[end] == '.') return kv.Value;
+                    start++;
+                }
+            }
             return null;
         }
     }
@@ -656,7 +743,8 @@ namespace BankMode
         public static bool RestoreNeedsAdmin(string statePath)
         {
             var st = Store.LoadState(statePath);
-            return st.Services.Count > 0 || st.RunApproved.Keys.Any(k => !k.StartsWith("HKCU|"));
+            return st.Services.Count > 0 || st.RunApproved.Keys.Any(k => !k.StartsWith("HKCU|")) ||
+                st.PendingChanges.Any(p => p != null && (p.Kind == "service" || (p.Kind == "run" && !string.IsNullOrEmpty(p.Key) && !p.Key.StartsWith("HKCU|", StringComparison.OrdinalIgnoreCase))));
         }
 
         static string Why(Exception ex)
@@ -666,14 +754,119 @@ namespace BankMode
             return (ex.InnerException ?? ex).Message;
         }
 
+        static string ServiceType(ServiceItem service)
+        {
+            return service.StartType == 2 ? (service.Delayed ? "delayed-auto" : "auto") :
+                service.StartType == 3 ? "demand" : service.StartType == 4 ? "disabled" : "unknown";
+        }
+
+        static PendingChange Journal(Ctx c, StateData state, string kind, string key, string before, string after, bool restore, bool track)
+        {
+            var pending = new PendingChange { Kind = kind, Key = key, Before = before ?? "", After = after ?? "", Restore = restore, Track = track };
+            state.PendingChanges.Add(pending);
+            // If this durable write fails, caller must not perform the corresponding system mutation.
+            Store.SaveState(c.StatePath, state);
+            return pending;
+        }
+
+        static void RecoverPending(Ctx c, StateData state, bool includeMachine)
+        {
+            foreach (var pending in state.PendingChanges.ToList())
+            {
+                if (pending == null || string.IsNullOrEmpty(pending.Kind) || string.IsNullOrEmpty(pending.Key))
+                {
+                    state.PendingChanges.Remove(pending);
+                    Store.SaveState(c.StatePath, state);
+                    continue;
+                }
+                if (!includeMachine && (pending.Kind == "service" || (pending.Kind == "run" && !pending.Key.StartsWith("HKCU|", StringComparison.OrdinalIgnoreCase)))) continue;
+                try { ReconcilePending(c, state, pending); }
+                catch (Exception ex) { c.Fail("이전 중단 작업 복구 확인 실패 (" + pending.Key + "): " + Why(ex)); }
+            }
+        }
+
+        static void ReconcilePending(Ctx c, StateData state, PendingChange pending)
+        {
+            string current;
+            if (pending.Kind == "service")
+            {
+                var service = Scanner.ScanServices().FirstOrDefault(s => string.Equals(s.Name, pending.Key, StringComparison.OrdinalIgnoreCase));
+                if (service == null)
+                {
+                    // A removed service has no state left to restore; discard stale records so
+                    // a future service reusing this name is never changed by an old journal.
+                    RemoveSavedChange(state, pending);
+                    state.PendingChanges.Remove(pending);
+                    c.Log("  - 이전 중단 작업: " + pending.Key + " 서비스가 없어 기록을 정리함");
+                    Store.SaveState(c.StatePath, state);
+                    return;
+                }
+                current = ServiceType(service);
+            }
+            else if (pending.Kind == "run")
+            {
+                int bar = pending.Key.IndexOf('|');
+                if (bar < 0) return;
+                string location = pending.Key.Substring(0, bar), name = pending.Key.Substring(bar + 1);
+                var loc = Scanner.Loc(location);
+                byte[] bytes = Scanner.ReadApproved(loc, name);
+                current = bytes == null ? "" : Convert.ToBase64String(bytes);
+            }
+            else return;
+
+            if (string.Equals(current, pending.After, StringComparison.Ordinal))
+            {
+                if (pending.Restore) RemoveSavedChange(state, pending);
+                else if (pending.Track) RecordAppliedChange(state, pending);
+                c.Log("  - 이전 중단 작업 확인: " + pending.Key + (pending.Restore ? " 복원 완료" : " 변경 완료"));
+            }
+            else if (!string.Equals(current, pending.Before, StringComparison.Ordinal))
+            {
+                c.Log("  - 이전 중단 작업: " + pending.Key + " 값이 달라 현재 값을 보존함");
+            }
+            state.PendingChanges.Remove(pending);
+            Store.SaveState(c.StatePath, state);
+        }
+
+        static void RecordAppliedChange(StateData state, PendingChange pending)
+        {
+            if (pending.Kind == "service")
+            {
+                if (!state.Services.ContainsKey(pending.Key)) state.Services[pending.Key] = pending.Before;
+                state.ServiceApplied[pending.Key] = pending.After;
+            }
+            else
+            {
+                if (!state.RunApproved.ContainsKey(pending.Key)) state.RunApproved[pending.Key] = pending.Before;
+                state.RunApplied[pending.Key] = pending.After;
+            }
+        }
+
+        static void RemoveSavedChange(StateData state, PendingChange pending)
+        {
+            if (pending.Kind == "service")
+            {
+                state.Services.Remove(pending.Key);
+                state.ServiceApplied.Remove(pending.Key);
+            }
+            else
+            {
+                state.RunApproved.Remove(pending.Key);
+                state.RunApplied.Remove(pending.Key);
+            }
+        }
+
         // ---------- 켜기 ----------
 
         // 관리자 단계: 서비스 시작
         public static void OnElevated(Ctx c)
         {
+            var state = Store.LoadState(c.StatePath);
+            RecoverPending(c, state, true);
             foreach (var m in Managed(c))
                 foreach (var s in m.Services)
-                    StartService(c, s);
+                    StartService(c, s, state);
+            Store.SaveState(c.StatePath, state);
         }
 
         // 사용자 단계: 시작프로그램을 부팅 때처럼 일반 권한으로 실행
@@ -701,7 +894,7 @@ namespace BankMode
                 }
         }
 
-        static void StartService(Ctx c, ServiceItem s)
+        static void StartService(Ctx c, ServiceItem s, StateData state)
         {
             try
             {
@@ -709,10 +902,16 @@ namespace BankMode
                 {
                     if (sc.Status == ServiceControllerStatus.Running) return;
                     // 끄기 때 '사용 안 함'으로 바꿔 둔 서비스는 켜려면 먼저 '수동'으로 풀어야 시작할 수 있다
-                    if (s.StartType == 4 && Sc("config \"" + s.Name + "\" start= demand") != 0)
+                    if (s.StartType == 4)
                     {
-                        c.Fail(s.DisplayName + ": '사용 안 함'을 풀지 못해 시작하지 못함");
-                        return;
+                        var pending = Journal(c, state, "service", s.Name, "disabled", "demand", false, true);
+                        int result = Sc("config \"" + s.Name + "\" start= demand");
+                        ReconcilePending(c, state, pending);
+                        if (result != 0)
+                        {
+                            c.Fail(s.DisplayName + ": '사용 안 함'을 풀지 못해 시작하지 못함");
+                            return;
+                        }
                     }
                     if (sc.Status != ServiceControllerStatus.StartPending) sc.Start();
                     sc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
@@ -730,6 +929,7 @@ namespace BankMode
         {
             var mods = Managed(c);
             var state = Store.LoadState(c.StatePath);
+            RecoverPending(c, state, false);
             DisableRuns(c, mods.SelectMany(m => m.RunEntries).Where(r => !r.IsMachine), state);
             Store.SaveState(c.StatePath, state);
             KillProcesses(c, mods, null, true);   // 권한 부족 실패는 관리자 단계에서 다시 시도하므로 조용히
@@ -740,6 +940,7 @@ namespace BankMode
         {
             var mods = Managed(c);
             var state = Store.LoadState(c.StatePath);
+            RecoverPending(c, state, true);
 
             // 감시(watchdog) 서비스가 프로세스를 되살리지 않도록 서비스부터 멈춘다
             foreach (var m in mods)
@@ -807,10 +1008,12 @@ namespace BankMode
         static void SetDisabled(Ctx c, ServiceItem s, StateData state)
         {
             if (s.StartType == 4) return;   // 이미 사용 안 함
-            string orig = s.StartType == 2 ? (s.Delayed ? "delayed-auto" : "auto") : "demand";
-            if (Sc("config \"" + s.Name + "\" start= disabled") == 0)
+            string orig = ServiceType(s);
+            var pending = Journal(c, state, "service", s.Name, orig, "disabled", false, true);
+            int result = Sc("config \"" + s.Name + "\" start= disabled");
+            ReconcilePending(c, state, pending);
+            if (result == 0)
             {
-                if (!state.Services.ContainsKey(s.Name)) state.Services[s.Name] = orig;
                 c.Log("  - " + s.DisplayName + ": 사용 안 함으로 바꿈 (부팅·요청 모두 안 켜짐)");
             }
             else c.Fail(s.DisplayName + ": 시작 유형을 바꾸지 못함 (자체 보호 기능일 수 있음)");
@@ -837,7 +1040,10 @@ namespace BankMode
                 {
                     var loc = Scanner.Loc(r.Location);
                     byte[] cur = Scanner.ReadApproved(loc, r.Name);
-                    Scanner.WriteApproved(loc, r.Name, DisabledBytes());
+                    byte[] disabled = DisabledBytes();
+                    string before = cur == null ? "" : Convert.ToBase64String(cur);
+                    Journal(c, state, "run", r.Key, before, Convert.ToBase64String(disabled), false, true);
+                    Scanner.WriteApproved(loc, r.Name, disabled);
                     written.Add(new KeyValuePair<RunItem, byte[]>(r, cur));
                 }
                 catch (Exception ex) { c.Fail("시작프로그램 '" + r.Name + "' 끄기 실패: " + Why(ex)); }
@@ -853,10 +1059,13 @@ namespace BankMode
                 catch { off = false; }
                 if (!off)
                 {
+                    var pending = state.PendingChanges.LastOrDefault(p => p != null && p.Kind == "run" && p.Key == r.Key);
+                    if (pending != null) ReconcilePending(c, state, pending);
                     c.Fail("시작프로그램 '" + r.Name + "': 껐지만 다시 켜져 있어요 (자체 보호 기능)");
                     continue;
                 }
-                if (!state.RunApproved.ContainsKey(r.Key)) state.RunApproved[r.Key] = kv.Value == null ? "" : Convert.ToBase64String(kv.Value);
+                var completed = state.PendingChanges.LastOrDefault(p => p != null && p.Kind == "run" && p.Key == r.Key);
+                if (completed != null) ReconcilePending(c, state, completed);
                 c.Log("  - 시작프로그램 '" + r.Name + "' 끔");
             }
         }
@@ -883,6 +1092,7 @@ namespace BankMode
         public static void RestoreUser(Ctx c)
         {
             var state = Store.LoadState(c.StatePath);
+            RecoverPending(c, state, false);
             RestoreRun(c, state, false);
             Store.SaveState(c.StatePath, state);
         }
@@ -890,12 +1100,58 @@ namespace BankMode
         public static void RestoreElevated(Ctx c)
         {
             var state = Store.LoadState(c.StatePath);
+            RecoverPending(c, state, true);
+            var services = Scanner.ScanServices();
+            var classifier = new Classifier(c.Settings);
             foreach (var kv in state.Services.ToList())
             {
-                if (Sc("config \"" + kv.Key + "\" start= " + kv.Value) == 0)
+                var service = services.FirstOrDefault(s => string.Equals(s.Name, kv.Key, StringComparison.OrdinalIgnoreCase));
+                if (service == null)
                 {
                     state.Services.Remove(kv.Key);
-                    c.Log("  - " + kv.Key + ": 부팅 때 자동 시작으로 복원");
+                    state.ServiceApplied.Remove(kv.Key);
+                    c.Log("  - " + kv.Key + ": 서비스가 없어 복원 기록을 정리함");
+                    continue;
+                }
+                if (kv.Value != "auto" && kv.Value != "delayed-auto" && kv.Value != "demand" && kv.Value != "disabled")
+                {
+                    c.Fail(kv.Key + ": 저장된 시작 유형이 올바르지 않아 복원을 건너뜀");
+                    continue;
+                }
+                string current = ServiceType(service);
+                if (string.Equals(current, kv.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    state.Services.Remove(kv.Key);
+                    state.ServiceApplied.Remove(kv.Key);
+                    c.Log("  - " + kv.Key + ": 이미 원래 시작 유형이라 복원 기록을 정리함");
+                    continue;
+                }
+                if (classifier.Find(service.ExePath) == null)
+                {
+                    c.Fail(kv.Key + ": 현재 보안 프로그램으로 확인되지 않아 복원을 건너뜀");
+                    continue;
+                }
+                string applied;
+                if (state.ServiceApplied.TryGetValue(kv.Key, out applied))
+                {
+                    if (!string.Equals(current, applied, StringComparison.OrdinalIgnoreCase))
+                    {
+                        c.Fail(kv.Key + ": BankMode가 설정한 뒤 값이 바뀌어 복원을 건너뜀 (현재 설정을 보존함)");
+                        continue;
+                    }
+                }
+                else if (service.StartType != 4)
+                {
+                    // 이전 버전 상태 파일 호환: 이전 버전은 마지막 적용 값을 저장하지 않았다.
+                    c.Fail(kv.Key + ": 현재 '사용 안 함' 상태가 아니어서 이전 버전 설정의 복원을 건너뜀");
+                    continue;
+                }
+                var pending = Journal(c, state, "service", kv.Key, current, kv.Value, true, false);
+                int result = Sc("config \"" + kv.Key + "\" start= " + kv.Value);
+                ReconcilePending(c, state, pending);
+                if (result == 0)
+                {
+                    c.Log("  - " + kv.Key + ": 원래 시작 유형으로 복원");
                 }
                 else c.Fail(kv.Key + ": 자동 시작 복원 실패");
             }
@@ -905,6 +1161,8 @@ namespace BankMode
 
         static void RestoreRun(Ctx c, StateData state, bool machine)
         {
+            var runs = Scanner.ScanRun();
+            var classifier = new Classifier(c.Settings);
             foreach (var kv in state.RunApproved.ToList())
             {
                 int bar = kv.Key.IndexOf('|');
@@ -913,12 +1171,62 @@ namespace BankMode
                 if ((locId != "HKCU") != machine) continue;
                 try
                 {
-                    Scanner.WriteApproved(Scanner.Loc(locId), name, kv.Value.Length == 0 ? null : Convert.FromBase64String(kv.Value));
-                    state.RunApproved.Remove(kv.Key);
+                    var run = runs.FirstOrDefault(r => r.Location == locId && r.Name == name);
+                    if (run == null)
+                    {
+                        state.RunApproved.Remove(kv.Key);
+                        state.RunApplied.Remove(kv.Key);
+                        c.Log("  - 시작프로그램 '" + name + "': 항목이 없어 복원 기록을 정리함");
+                        continue;
+                    }
+                    var loc = Scanner.Loc(locId);
+                    byte[] current = Scanner.ReadApproved(loc, name);
+                    byte[] original = kv.Value.Length == 0 ? null : Convert.FromBase64String(kv.Value);
+                    if (BytesEqual(current, original))
+                    {
+                        state.RunApproved.Remove(kv.Key);
+                        state.RunApplied.Remove(kv.Key);
+                        c.Log("  - 시작프로그램 '" + name + "': 이미 원래 상태라 복원 기록을 정리함");
+                        continue;
+                    }
+                    if (classifier.Find(run.ExePath) == null)
+                    {
+                        c.Fail("시작프로그램 '" + name + "': 현재 보안 프로그램으로 확인되지 않아 복원을 건너뜀");
+                        continue;
+                    }
+                    string expected;
+                    if (state.RunApplied.TryGetValue(kv.Key, out expected))
+                    {
+                        byte[] expectedBytes = expected.Length == 0 ? null : Convert.FromBase64String(expected);
+                        if (!BytesEqual(current, expectedBytes))
+                        {
+                            c.Fail("시작프로그램 '" + name + "': BankMode가 설정한 뒤 값이 바뀌어 복원을 건너뜀 (현재 설정을 보존함)");
+                            continue;
+                        }
+                    }
+                    else if (Scanner.IsApprovedEnabled(current))
+                    {
+                        // 이전 버전 상태 파일 호환: 이전 버전은 마지막 적용 값을 저장하지 않았다.
+                        c.Fail("시작프로그램 '" + name + "': 현재 꺼짐 상태가 아니어서 이전 버전 설정의 복원을 건너뜀");
+                        continue;
+                    }
+                    var pending = Journal(c, state, "run", kv.Key,
+                        current == null ? "" : Convert.ToBase64String(current),
+                        original == null ? "" : Convert.ToBase64String(original), true, false);
+                    Scanner.WriteApproved(loc, name, original);
+                    ReconcilePending(c, state, pending);
                     c.Log("  - 시작프로그램 '" + name + "' 복원");
                 }
                 catch (Exception ex) { c.Fail("시작프로그램 '" + name + "' 복원 실패: " + Why(ex)); }
             }
+        }
+
+        static bool BytesEqual(byte[] left, byte[] right)
+        {
+            if (left == null || right == null) return left == null && right == null;
+            if (left.Length != right.Length) return false;
+            for (int i = 0; i < left.Length; i++) if (left[i] != right[i]) return false;
+            return true;
         }
     }
 
@@ -930,6 +1238,8 @@ namespace BankMode
         public int Found, Managed, Running, BootAuto;
         public long Memory;
         public bool On { get { return Running > 0; } }
+        public bool Partial { get { return Running > 0 && Running < Managed; } }
+        public bool AllOn { get { return Managed > 0 && Running == Managed; } }
 
         public static Summary Of(IEnumerable<BankModule> mods)
         {
@@ -965,7 +1275,14 @@ namespace BankMode
         {
             return Exclusive(c, () =>
             {
-                if (Ops.OnNeedsAdmin(mods ?? Scanner.Discover(c.Settings)) && !RunElevated(c, "on")) return false;
+                var targets = mods ?? Scanner.Discover(c.Settings);
+                if (Ops.OnNeedsAdmin(targets))
+                {
+                    var changes = targets.Where(m => !m.Excluded).SelectMany(m =>
+                        m.Services.Where(s => !s.Running).Select(s => m.Name + " — 서비스 " + s.DisplayName + PathSuffix(s.ExePath))
+                        .Concat(m.RunEntries.Select(r => m.Name + " — 시작프로그램 " + r.Name + PathSuffix(r.ExePath))));
+                    if (!ConfirmTargets(c, "켜기", changes) || !RunElevated(c, "on")) return false;
+                }
                 Ops.OnUser(c);
                 return true;
             });
@@ -974,10 +1291,44 @@ namespace BankMode
         // 끄기: 내 권한으로 할 수 있는 것부터 → 남은 것만 관리자 권한으로
         public static bool TurnOff(Ctx c)
         {
+            return TurnOffCore(c, "끄기", false);
+        }
+
+        // 부분 실패 후 다시 시도: 현재 상태를 다시 읽어 아직 켜져 있는 항목만 대상으로 한다.
+        public static bool RetryOff(Ctx c)
+        {
+            return TurnOffCore(c, "남은 항목 다시 끄기", true);
+        }
+
+        static bool TurnOffCore(Ctx c, string operation, bool retryOnly)
+        {
             return Exclusive(c, () =>
             {
+                var targets = Scanner.Discover(c.Settings);
+                var unfinished = targets.Where(m => !m.Excluded &&
+                    (m.Services.Any(s => s.Running || s.StartType != 4) ||
+                     m.RunEntries.Any(r => r.Enabled) || m.Processes.Count > 0)).ToList();
+                var state = Store.LoadState(c.StatePath);
+                bool pendingAdmin = state.PendingChanges.Any(p => p != null &&
+                    (p.Kind == "service" || (p.Kind == "run" && !string.IsNullOrEmpty(p.Key) &&
+                    !p.Key.StartsWith("HKCU|", StringComparison.OrdinalIgnoreCase))));
+                if (retryOnly && unfinished.Count == 0 && state.PendingChanges.Count == 0)
+                {
+                    c.Log("  - 다시 시도할 항목이 없습니다. 관리 대상이 모두 꺼져 있어요");
+                    return true;
+                }
+
+                bool needsAdmin = Ops.OffNeedsAdmin(unfinished) || (retryOnly && pendingAdmin);
+                if (needsAdmin)
+                {
+                    var changes = unfinished.SelectMany(m =>
+                        m.Services.Where(s => s.Running || s.StartType != 4).Select(s => m.Name + " — 서비스 " + s.DisplayName + " 중지/자동 시작 해제" + PathSuffix(s.ExePath))
+                        .Concat(m.RunEntries.Where(r => r.Enabled).Select(r => m.Name + " — 시작프로그램 " + r.Name + " 사용 안 함" + PathSuffix(r.ExePath)))
+                        .Concat(m.Processes.Select(p => m.Name + " — 프로세스 " + p.Name + ".exe 종료" + PathSuffix(p.FilePath))));
+                    if (!ConfirmTargets(c, operation, changes)) return false;
+                }
+                if (needsAdmin && !RunElevated(c, "off")) return false;
                 Ops.OffUser(c);
-                if (Ops.OffNeedsAdmin(Scanner.Discover(c.Settings))) RunElevated(c, "off");
                 return true;
             });
         }
@@ -986,11 +1337,44 @@ namespace BankMode
         {
             return Exclusive(c, () =>
             {
+                var state = Store.LoadState(c.StatePath);
+                if (state.Services.Count == 0 && state.RunApproved.Count == 0 && state.PendingChanges.Count == 0) return true;
+                bool needsAdmin = Ops.RestoreNeedsAdmin(c.StatePath);
+                var servicePaths = Scanner.ScanServices().ToDictionary(s => s.Name, s => s.ExePath, StringComparer.OrdinalIgnoreCase);
+                var runPaths = Scanner.ScanRun().ToDictionary(r => r.Key, r => r.ExePath, StringComparer.OrdinalIgnoreCase);
+                var changes = state.Services.Keys.Select(name => "서비스 " + name + " 시작 유형 복원" + PathSuffix(servicePaths.ContainsKey(name) ? servicePaths[name] : null))
+                    .Concat(state.RunApproved.Keys.Select(key => "시작프로그램 " + key.Substring(key.IndexOf('|') + 1) + " 상태 복원" + PathSuffix(runPaths.ContainsKey(key) ? runPaths[key] : null)))
+                    .Concat(state.PendingChanges.Where(p => p != null).Select(p => p.Kind == "service"
+                        ? "서비스 " + p.Key + ": 중단된 변경 상태 확인"
+                        : p.Kind == "run" ? "시작프로그램 " + (p.Key ?? "").Substring((p.Key ?? "").IndexOf('|') + 1) + ": 중단된 변경 상태 확인"
+                        : "이전 중단 작업 상태 확인"));
+                if (!ConfirmTargets(c, "원래대로 되돌리기", changes)) return false;
+                if (needsAdmin && !RunElevated(c, "restore")) return false;
                 Ops.RestoreUser(c);
-                if (Ops.RestoreNeedsAdmin(c.StatePath)) RunElevated(c, "restore");
                 return true;
             });
         }
+
+        sealed class WindowOwner : IWin32Window
+        {
+            public IntPtr Handle { get; private set; }
+            public WindowOwner(IntPtr handle) { Handle = handle; }
+        }
+
+        static bool ConfirmTargets(Ctx c, string operation, IEnumerable<string> targets)
+        {
+            var list = targets.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            if (list.Count == 0) return true;
+            var detail = string.Join("\n", list.Take(12).Select(x => "  • " + x));
+            if (list.Count > 12) detail += "\n  … 외 " + (list.Count - 12) + "개";
+            string prompt = "다음 항목을 " + operation + "합니다. 계속할까요?\n\n" + detail +
+                "\n\n계속하면 관리자 권한 확인 창이 이어서 나타날 수 있습니다.";
+            IWin32Window owner = c.Owner == IntPtr.Zero ? null : new WindowOwner(c.Owner);
+            return MessageBox.Show(owner, prompt, "은행 모드 — 변경 대상 확인", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        }
+
+        static string PathSuffix(string path) { return string.IsNullOrWhiteSpace(path) ? "" : "\n    " + path; }
 
         // 앱 창과 크롬 확장이 동시에 켜고 끄면 state.json이 엉킬 수 있어 한 번에 하나만 실행
         static bool Exclusive(Ctx c, Func<bool> body)

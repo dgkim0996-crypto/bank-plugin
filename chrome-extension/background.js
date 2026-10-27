@@ -120,6 +120,9 @@ function badgeFor(st, site) {
     return { text: '…', color: COLOR.busy, title: st.busy.cmd === 'on' ? '은행 모드 켜는 중…' : '은행 모드 끄는 중…' };
   }
   if (s && s.on) {
+    if (s.partial) {
+      return { text: '~', color: COLOR.warn, title: `은행 모드 일부 켜짐 — ${s.running}/${s.managed}개 모듈 실행 중` };
+    }
     return { text: 'ON', color: COLOR.on, title: `은행 모드 켜짐 — ${s.running}개 실행 중 · 메모리 ${s.memoryMB} MB` };
   }
   if (site && s) {

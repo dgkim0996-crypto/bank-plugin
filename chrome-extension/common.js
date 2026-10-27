@@ -2,21 +2,56 @@
 
 export const HOST = 'com.bankmode.host';
 
-// 앱에서 사이트 목록을 아직 못 받았을 때 쓰는 기본값 (앱 settings.json 기본값과 같음)
-export const DEFAULT_SITES = [
-  { name: 'KB국민은행', url: 'https://www.kbstar.com' },
-  { name: '신한은행', url: 'https://www.shinhan.com' },
-  { name: '우리은행', url: 'https://www.wooribank.com' },
-  { name: '하나은행', url: 'https://www.kebhana.com' },
-  { name: 'IBK기업은행', url: 'https://www.ibk.co.kr' },
-  { name: 'NH농협은행', url: 'https://banking.nonghyup.com' },
-  { name: '홈택스', url: 'https://www.hometax.go.kr' },
-  { name: '정부24', url: 'https://www.gov.kr' },
-];
+let defaultSitesPromise;
 
 export async function getSites() {
   const { sites } = await chrome.storage.local.get('sites');
-  return Array.isArray(sites) && sites.length ? sites : DEFAULT_SITES;
+  if (Array.isArray(sites) && sites.length) return sites;
+  if (!defaultSitesPromise) {
+    defaultSitesPromise = fetch(chrome.runtime.getURL('sites.json')).then((r) => r.json()).catch(() => []);
+  }
+  return defaultSitesPromise;
+}
+
+export function sitePermissionPattern(site) {
+  try {
+    const u = new URL(site.url);
+    if ((u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) return null;
+    if (u.port && !((u.protocol === 'https:' && u.port === '443') || (u.protocol === 'http:' && u.port === '80'))) return null;
+    // Host permissions must stay scoped to one valid DNS name and its subdomains.
+    // Reject IPs, localhost, wildcards, and malformed labels rather than ever
+    // turning unexpected site data into a broader Chrome match pattern.
+    const host = u.hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+    if (!host || host.length > 253 || host === 'localhost' || /^\d+(?:\.\d+){3}$/.test(host)) return null;
+    const labels = host.split('.');
+    if (labels.length < 2 || labels.some((label) =>
+      label.length < 1 || label.length > 63 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) return null;
+    return `${u.protocol}//*.${host}/*`;
+  } catch {
+    return null;
+  }
+}
+
+// True only when a site permission is already supplied by the extension's
+// required manifest permissions. Such permissions cannot be revoked per site.
+export function sitePermissionIsStatic(site, patterns = chrome.runtime.getManifest().host_permissions || []) {
+  const target = sitePermissionPattern(site);
+  if (!target) return false;
+  const targetUrl = new URL(site.url);
+  const targetHost = targetUrl.hostname.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+  return patterns.some((pattern) => {
+    const match = /^(\*|https?|file):\/\/([^/]+)\/(.*)$/.exec(pattern);
+    if (!match || match[1] === 'file') return false;
+    const [, scheme, hostPattern, path] = match;
+    if (scheme !== '*' && `${scheme}:` !== targetUrl.protocol) return false;
+    if (path !== '*') return false;
+    if (hostPattern === '*') return true;
+    if (hostPattern.startsWith('*.')) {
+      const base = hostPattern.slice(2).toLowerCase();
+      return targetHost === base || targetHost.endsWith(`.${base}`);
+    }
+    return false; // An exact host does not cover the site's registered subdomains.
+  });
 }
 
 // 주소가 등록된 은행 사이트(또는 그 하위 도메인)면 그 사이트를 돌려준다
